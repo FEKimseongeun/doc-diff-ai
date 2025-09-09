@@ -1,3 +1,5 @@
+[-> EN VERSION README](https://github.com/FEKimseongeun/doc-diff-ai/blob/master/README-EN.md)
+
 # 📑 문서 비교 서비스 (Document Comparison Service)
 
 AI 기반 문서 비교 서비스로, 원본과 개정된 문서(Word, PDF, Excel)를 비교하여 텍스트, 서식, 표, 이미지 등 다양한 변경 사항을 자동으로 식별합니다.
