@@ -1,0 +1,346 @@
+{% extends "layout.html" %}
+{% block title %}문서 비교 - 문서 비교 시스템{% endblock %}
+
+{% block extra_css %}
+<style>
+    .upload-area {
+        border: 2px dashed var(--border);
+        border-radius: 15px;
+        padding: 40px;
+        text-align: center;
+        transition: all 0.3s;
+        background: var(--bg);
+    }
+
+    .upload-area:hover {
+        border-color: var(--primary);
+        background: #f1f5f9;
+    }
+
+    .upload-area.dragover {
+        border-color: var(--primary);
+        background: rgba(102, 126, 234, 0.1);
+    }
+
+    .file-input {
+        display: none;
+    }
+
+    .file-label {
+        display: inline-block;
+        padding: 10px 25px;
+        background: var(--primary);
+        color: white;
+        border-radius: 20px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .file-label:hover {
+        background: var(--primary-dark);
+    }
+
+    .file-info {
+        margin-top: 15px;
+        padding: 10px;
+        background: white;
+        border-radius: 10px;
+        display: none;
+    }
+
+    .file-info.active {
+        display: block;
+    }
+
+    .compare-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        margin: 30px 0;
+    }
+
+    .file-section {
+        position: relative;
+    }
+
+    .file-section h3 {
+        margin-bottom: 15px;
+        color: var(--text);
+    }
+
+    .badge {
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .badge-original {
+        background: var(--danger);
+        color: white;
+    }
+
+    .badge-revised {
+        background: var(--success);
+        color: white;
+    }
+
+    .options-section {
+        background: var(--bg);
+        padding: 20px;
+        border-radius: 10px;
+        margin: 20px 0;
+    }
+
+    .option-group {
+        margin-bottom: 15px;
+    }
+
+    .option-group label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        margin-bottom: 10px;
+    }
+
+    .option-group input[type="checkbox"] {
+        margin-right: 10px;
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .option-desc {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-left: 30px;
+    }
+
+    .submit-section {
+        text-align: center;
+        margin-top: 30px;
+    }
+
+    .loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.7);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .loading-overlay.active {
+        display: flex;
+    }
+
+    .loading-content {
+        background: white;
+        padding: 40px;
+        border-radius: 20px;
+        text-align: center;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid var(--border);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>📑 문서 비교</h2>
+    <p style="color: var(--muted); margin-bottom: 30px;">
+        비교할 원본 문서와 수정본 문서를 업로드하세요.
+    </p>
+
+    <form id="compareForm" action="{{ url_for('main.process_comparison') }}" method="post" enctype="multipart/form-data">
+        <div class="compare-grid">
+            <div class="file-section">
+                <span class="badge badge-original">원본</span>
+                <h3>원본 문서</h3>
+                <div class="upload-area" id="originalDropZone">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">📁</div>
+                    <p style="margin-bottom: 15px;">파일을 드래그하거나 클릭하여 선택</p>
+                    <label for="originalFile" class="file-label">파일 선택</label>
+                    <input type="file" id="originalFile" name="original_file" class="file-input"
+                           accept=".xlsx,.xls,.docx,.doc,.pdf" required>
+                    <div class="file-info" id="originalInfo"></div>
+                </div>
+            </div>
+
+            <div class="file-section">
+                <span class="badge badge-revised">수정본</span>
+                <h3>수정본 문서</h3>
+                <div class="upload-area" id="revisedDropZone">
+                    <div style="font-size: 3rem; margin-bottom: 15px;">📁</div>
+                    <p style="margin-bottom: 15px;">파일을 드래그하거나 클릭하여 선택</p>
+                    <label for="revisedFile" class="file-label">파일 선택</label>
+                    <input type="file" id="revisedFile" name="revised_file" class="file-input"
+                           accept=".xlsx,.xls,.docx,.doc,.pdf" required>
+                    <div class="file-info" id="revisedInfo"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="options-section">
+            <h3>비교 옵션</h3>
+            <div class="option-group">
+                <label>
+                    <input type="checkbox" name="ignore_case" checked>
+                    <span>대소문자 무시</span>
+                </label>
+                <div class="option-desc">대소문자 차이를 무시하고 비교합니다</div>
+            </div>
+
+            <div class="option-group">
+                <label>
+                    <input type="checkbox" name="ignore_whitespace">
+                    <span>공백 무시</span>
+                </label>
+                <div class="option-desc">앞뒤 공백을 무시하고 비교합니다</div>
+            </div>
+
+            <div class="option-group">
+                <label>
+                    <input type="checkbox" name="show_context" checked>
+                    <span>컨텍스트 표시</span>
+                </label>
+                <div class="option-desc">변경된 부분의 주변 내용을 함께 표시합니다</div>
+            </div>
+
+            <div class="option-group">
+                <label>
+                    컨텍스트 라인 수:
+                    <input type="number" name="context_lines" value="2" min="0" max="5"
+                           style="width: 60px; margin-left: 10px; padding: 5px;">
+                </label>
+            </div>
+        </div>
+
+        <div class="submit-section">
+            <button type="submit" class="btn" style="font-size: 1.1rem; padding: 15px 40px;">
+                🔍 비교 시작
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-content">
+        <div class="spinner"></div>
+        <h3>문서 비교 중...</h3>
+        <p style="color: var(--muted); margin-top: 10px;">
+            파일 크기에 따라 시간이 소요될 수 있습니다
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 파일 업로드 처리
+    function handleFileSelect(input, infoId) {
+        const file = input.files[0];
+        if (file) {
+            const info = document.getElementById(infoId);
+            const fileSize = (file.size / 1024 / 1024).toFixed(2);
+            info.innerHTML = `
+                <strong>📄 ${file.name}</strong><br>
+                <small>크기: ${fileSize} MB | 형식: ${file.name.split('.').pop().toUpperCase()}</small>
+            `;
+            info.classList.add('active');
+        }
+    }
+
+    document.getElementById('originalFile').addEventListener('change', function() {
+        handleFileSelect(this, 'originalInfo');
+    });
+
+    document.getElementById('revisedFile').addEventListener('change', function() {
+        handleFileSelect(this, 'revisedInfo');
+    });
+
+    // 드래그 앤 드롭 처리
+    function setupDropZone(dropZoneId, fileInputId) {
+        const dropZone = document.getElementById(dropZoneId);
+        const fileInput = document.getElementById(fileInputId);
+
+        dropZone.addEventListener('click', function() {
+            fileInput.click();
+        });
+
+        dropZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', function() {
+            this.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        });
+    }
+
+    setupDropZone('originalDropZone', 'originalFile');
+    setupDropZone('revisedDropZone', 'revisedFile');
+
+    // 폼 제출 처리
+    document.getElementById('compareForm').addEventListener('submit', function(e) {
+        const originalFile = document.getElementById('originalFile').files[0];
+        const revisedFile = document.getElementById('revisedFile').files[0];
+
+        if (!originalFile || !revisedFile) {
+            e.preventDefault();
+            alert('원본과 수정본 파일을 모두 선택해주세요.');
+            return;
+        }
+
+        // 파일 형식 확인
+        const originalExt = originalFile.name.split('.').pop().toLowerCase();
+        const revisedExt = revisedFile.name.split('.').pop().toLowerCase();
+
+        const getFileType = (ext) => {
+            if (['xlsx', 'xls'].includes(ext)) return 'excel';
+            if (['docx', 'doc'].includes(ext)) return 'word';
+            if (ext === 'pdf') return 'pdf';
+            return null;
+        };
+
+        if (getFileType(originalExt) !== getFileType(revisedExt)) {
+            e.preventDefault();
+            alert('원본과 수정본의 파일 형식이 같아야 합니다.');
+            return;
+        }
+
+        // 로딩 표시
+        document.getElementById('loadingOverlay').classList.add('active');
+    });
+</script>
+{% endblock %}

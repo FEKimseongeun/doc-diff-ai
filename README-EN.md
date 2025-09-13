@@ -27,7 +27,7 @@ An AI-powered service that compares original and revised documents (Word, PDF, E
 1. **Clone or download the project**:
    ```bash
    git clone <repository-url>
-   cd document-comparison-service
+   cd document-comparison-services
    ```
 
 2. **Create a virtual environment** (recommended):
